@@ -2,8 +2,7 @@
 pipeline {
     agent {
         kubernetes {
-    yaml '''
-
+            yaml '''
 apiVersion: v1
 kind: Pod
 spec:
@@ -42,18 +41,21 @@ spec:
     command: ["cat"]
     tty: true
 
- 
+  - name: sonar
+    image: sonarsource/sonar-scanner-cli:latest
+    command: ["cat"]
+    tty: true
 '''
-}
+        }
     }
 
     environment {
-        AWS_REGION    = 'us-east-1'
+        AWS_REGION     = 'us-east-1'
         AWS_ACCOUNT_ID = '259072552887'
-        ECR_REGISTRY  = '259072552887.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_REGISTRY   = '259072552887.dkr.ecr.us-east-1.amazonaws.com'
 
-        EKS_CLUSTER   = 'med-erp-dev-eks'
-        K8S_NAMESPACE = 'med-erp'
+        EKS_CLUSTER    = 'med-erp-dev-eks'
+        K8S_NAMESPACE  = 'med-erp'
 
         IMAGE_TAG = ''
     }
@@ -66,153 +68,152 @@ spec:
 
     stages {
 
+        // -----------------------------------------
+        // 1. CHECKOUT
+        // -----------------------------------------
+
         stage('Checkout') {
-    steps {
-        checkout scm
+            steps {
+                checkout scm
 
-        script {
-            env.IMAGE_TAG = sh(
-                script: 'git rev-parse --short=8 HEAD',
-                returnStdout: true
-            ).trim()
+                script {
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse --short=8 HEAD',
+                        returnStdout: true
+                    ).trim()
 
-            echo "Building image tag: ${env.IMAGE_TAG}"
+                    if (!env.IMAGE_TAG) {
+                        error('IMAGE_TAG generation failed')
+                    }
+
+                    echo "Branch: ${env.GIT_BRANCH}"
+                    echo "Commit: ${env.IMAGE_TAG}"
+                }
+            }
         }
 
-        echo "BRANCH_NAME: ${env.BRANCH_NAME}"
-        echo "GIT_BRANCH: ${env.GIT_BRANCH}"
-        echo "IMAGE_TAG: ${env.IMAGE_TAG}"
-    }
-}
+        // -----------------------------------------
+        // 2. INSTALL TOOLS
+        // -----------------------------------------
+
         stage('Install Tools') {
-    steps {
-        container('tools') {
-            sh '''
-                apk add --no-cache \
-                  docker-cli \
-                  aws-cli \
-                  kubectl \
-                  curl
-
-                echo "Waiting for Docker daemon..."
-
-                for i in $(seq 1 30); do
-                    if docker info >/dev/null 2>&1; then
-                        echo "Docker daemon is ready!"
-                        docker version
-                        break
-                    fi
-
-                    echo "Waiting for Docker... ($i/30)"
-                    sleep 2
-                done
-
-                docker info
-                aws --version
-                kubectl version --client
-            '''
-        }
-    }
-}
-       
-stage('Build and Test') {
-    parallel {
-        stage('User Service') {
             steps {
-                dir('user-service') {
-                    container('maven') {
-                        sh '''
-                            mvn -B clean verify
+                container('tools') {
+                    sh '''
+                        apk add --no-cache \
+                          docker-cli \
+                          aws-cli \
+                          kubectl \
+                          curl
 
-                            echo "User Service test reports:"
-                            find target -type f -name "TEST-*.xml" || true
-                        '''
-                    }
+                        echo "Waiting for Docker daemon..."
 
-                    junit(
-                        testResults: '**/target/surefire-reports/TEST-*.xml',
-                        allowEmptyResults: true
-                    )
+                        for i in $(seq 1 30); do
+                            if docker info >/dev/null 2>&1; then
+                                echo "Docker daemon is ready"
+                                break
+                            fi
+
+                            echo "Waiting for Docker ($i/30)"
+                            sleep 2
+                        done
+
+                        docker info
+                        aws --version
+                        kubectl version --client
+                    '''
                 }
             }
         }
 
-        stage('Product Service') {
-            steps {
-                dir('product-service') {
-                    container('maven') {
-                        sh '''
-                            mvn -B clean verify
+        // -----------------------------------------
+        // 3. MAVEN BUILD AND TEST
+        // -----------------------------------------
 
-                            echo "Product Service test reports:"
-                            find target -type f -name "TEST-*.xml" || true
-                        '''
+        stage('Build and Test') {
+            parallel {
+
+                stage('User Service') {
+                    steps {
+                        dir('user-service') {
+                            container('maven') {
+                                sh 'mvn -B clean verify'
+                            }
+
+                            junit(
+                                testResults: 'target/surefire-reports/TEST-*.xml',
+                                allowEmptyResults: true
+                            )
+                        }
                     }
+                }
 
-                    junit(
-                        testResults: '**/target/surefire-reports/TEST-*.xml',
-                        allowEmptyResults: true
-                    )
+                stage('Product Service') {
+                    steps {
+                        dir('product-service') {
+                            container('maven') {
+                                sh 'mvn -B clean verify'
+                            }
+
+                            junit(
+                                testResults: 'target/surefire-reports/TEST-*.xml',
+                                allowEmptyResults: true
+                            )
+                        }
+                    }
+                }
+
+                stage('Order Service') {
+                    steps {
+                        dir('order-service') {
+                            container('maven') {
+                                sh 'mvn -B clean verify'
+                            }
+
+                            junit(
+                                testResults: 'target/surefire-reports/TEST-*.xml',
+                                allowEmptyResults: true
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        stage('Order Service') {
-            steps {
-                dir('order-service') {
-                    container('maven') {
-                        sh '''
-                            mvn -B clean verify
+        // -----------------------------------------
+        // 4. SONARCLOUD ANALYSIS
+        // -----------------------------------------
 
-                            echo "Order Service test reports:"
-                            find target -type f -name "TEST-*.xml" || true
+        stage('SonarCloud Analysis') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'SONARCLOUD_TOKEN',
+                        variable: 'SONAR_TOKEN'
+                    )
+                ]) {
+                    container('sonar') {
+                        sh '''
+                            sonar-scanner \
+                              -Dsonar.projectKey=waghvedant1990_medical-erp-3Tier \
+                              -Dsonar.organization=waghvedant1990 \
+                              -Dsonar.host.url=https://sonarcloud.io \
+                              -Dsonar.sources=user-service/src/main,product-service/src/main,order-service/src/main \
+                              -Dsonar.tests=user-service/src/test,product-service/src/test,order-service/src/test \
+                              -Dsonar.java.binaries=user-service/target/classes,product-service/target/classes,order-service/target/classes \
+                              -Dsonar.token="$SONAR_TOKEN" \
+                              -Dsonar.qualitygate.wait=true
                         '''
                     }
-
-                    junit(
-                        testResults: '**/target/surefire-reports/TEST-*.xml',
-                        allowEmptyResults: true
-                    )
                 }
             }
         }
-    }
-}
 
-
-           
-stage('SonarCloud Analysis') {
-    when {
-        branch 'main'
-    }
-
-    steps {
-        withCredentials([
-            string(
-                credentialsId: 'SONARCLOUD_TOKEN',
-                variable: 'SONAR_TOKEN'
-            )
-        ]) {
-            container('maven') {
-                sh """
-                    mvn sonar:sonar \
-                      -Dsonar.projectKey=waghvedant1990_medical-erp-3Tier \
-                      -Dsonar.organization=waghvedant1990 \
-                      -Dsonar.host.url=https://sonarcloud.io \
-                      -Dsonar.token=\$SONAR_TOKEN \
-                      -Dsonar.qualitygate.wait=true \
-                      -B
-                """
-            }
-        }
-    }
-}
+        // -----------------------------------------
+        // 5. DOCKER BUILD AND PUSH TO ECR
+        // -----------------------------------------
 
         stage('Docker Build and Push') {
-            when {
-                branch 'main'
-            }
-
             steps {
                 withCredentials([
                     [
@@ -225,17 +226,6 @@ stage('SonarCloud Analysis') {
                     container('tools') {
                         script {
                             sh '''
-                                echo "Waiting for Docker daemon..."
-
-                                for i in $(seq 1 30); do
-                                  if docker info >/dev/null 2>&1; then
-                                    break
-                                  fi
-                                  sleep 2
-                                done
-
-                                docker info
-
                                 aws ecr get-login-password \
                                   --region "$AWS_REGION" |
                                 docker login \
@@ -257,6 +247,8 @@ stage('SonarCloud Analysis') {
                                 def latestImage =
                                     "${env.ECR_REGISTRY}/med-erp/${svc}:latest"
 
+                                echo "Building ${imageName}"
+
                                 sh """
                                     docker build \
                                       -t ${imageName} \
@@ -273,11 +265,11 @@ stage('SonarCloud Analysis') {
             }
         }
 
-        stage('Trivy Security Scan') {
-            when {
-                branch 'main'
-            }
+        // -----------------------------------------
+        // 6. TRIVY SECURITY SCAN
+        // -----------------------------------------
 
+        stage('Trivy Security Scan') {
             steps {
                 withCredentials([
                     [
@@ -297,13 +289,18 @@ stage('SonarCloud Analysis') {
 
                             services.each { svc ->
 
+                                def imageName =
+                                    "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}"
+
+                                echo "Scanning ${imageName}"
+
                                 sh """
                                     trivy image \
                                       --scanners vuln \
                                       --exit-code 1 \
                                       --severity HIGH,CRITICAL \
                                       --no-progress \
-                                      ${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}
+                                      ${imageName}
                                 """
                             }
                         }
@@ -312,66 +309,98 @@ stage('SonarCloud Analysis') {
             }
         }
 
-        
-stage('Deploy to EKS') {
-    steps {
-        container('tools') {
-            script {
-                if (!env.IMAGE_TAG?.trim()) {
-                    error("IMAGE_TAG is missing")
+        // -----------------------------------------
+        // 7. DEPLOY TO EKS
+        // -----------------------------------------
+
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    if (!env.IMAGE_TAG?.trim()) {
+                        error('IMAGE_TAG is missing. Deployment stopped.')
+                    }
                 }
 
-                sh """
-                    aws eks update-kubeconfig \
-                      --region ${AWS_REGION} \
-                      --name ${EKS_CLUSTER}
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'AWS_CREDENTIALS',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    container('tools') {
+                        sh '''
+                            echo "Connecting to EKS..."
 
-                    kubectl apply -f k8s/ -n ${K8S_NAMESPACE}
+                            aws eks update-kubeconfig \
+                              --region "$AWS_REGION" \
+                              --name "$EKS_CLUSTER"
 
-                    kubectl set image deployment/user-service \
-                      user-service=${ECR_REGISTRY}/med-erp/user-service:${IMAGE_TAG} \
-                      -n ${K8S_NAMESPACE}
+                            echo "Applying Kubernetes manifests..."
 
-                    kubectl set image deployment/product-service \
-                      product-service=${ECR_REGISTRY}/med-erp/product-service:${IMAGE_TAG} \
-                      -n ${K8S_NAMESPACE}
+                            kubectl apply -R -f k8s/ \
+                              -n "$K8S_NAMESPACE"
+                        '''
 
-                    kubectl set image deployment/order-service \
-                      order-service=${ECR_REGISTRY}/med-erp/order-service:${IMAGE_TAG} \
-                      -n ${K8S_NAMESPACE}
+                        script {
+                            def services = [
+                                'user-service',
+                                'product-service',
+                                'order-service'
+                            ]
 
-                    kubectl rollout status deployment/user-service \
-                      -n ${K8S_NAMESPACE} --timeout=300s
+                            services.each { svc ->
 
-                    kubectl rollout status deployment/product-service \
-                      -n ${K8S_NAMESPACE} --timeout=300s
+                                def imageName =
+                                    "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}"
 
-                    kubectl rollout status deployment/order-service \
-                      -n ${K8S_NAMESPACE} --timeout=300s
-                """
+                                echo "Deploying ${imageName}"
+
+                                sh """
+                                    kubectl set image \
+                                      deployment/${svc} \
+                                      ${svc}=${imageName} \
+                                      -n ${env.K8S_NAMESPACE}
+
+                                    kubectl rollout status \
+                                      deployment/${svc} \
+                                      -n ${env.K8S_NAMESPACE} \
+                                      --timeout=300s
+                                """
+                            }
+                        }
+
+                        sh '''
+                            echo "Deployment verification"
+
+                            kubectl get deployments -n "$K8S_NAMESPACE"
+                            kubectl get pods -n "$K8S_NAMESPACE"
+                            kubectl get services -n "$K8S_NAMESPACE"
+                        '''
+                    }
+                }
             }
         }
     }
-}
+
+    // -----------------------------------------
+    // POST BUILD ACTIONS
+    // -----------------------------------------
+
+    post {
+        success {
+            echo 'Medical ERP CI/CD completed successfully!'
+            echo "Docker Image Tag: ${env.IMAGE_TAG}"
+        }
+
+        failure {
+            echo 'Medical ERP CI/CD pipeline failed.'
+            echo 'Check the failed stage in Jenkins console output.'
+        }
+
+        always {
+            cleanWs()
+        }
     }
-}
-
-    
-
-    
-post {
-    success {
-        echo "CI/CD Pipeline completed successfully!"
-        echo "Docker Image Tag: ${env.IMAGE_TAG}"
-    }
-
-    failure {
-        echo "CI/CD Pipeline failed. Check Jenkins console logs."
-    }
-
-    always {
-        cleanWs()
-    }
-}
-
 }
