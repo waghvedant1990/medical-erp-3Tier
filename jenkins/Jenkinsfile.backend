@@ -67,20 +67,23 @@ spec:
     stages {
 
         stage('Checkout') {
-            steps {
-                checkout scm
+    steps {
+        checkout scm
 
-                script {
-                    env.IMAGE_TAG = sh(
-                        script: 'git rev-parse --short=8 HEAD',
-                        returnStdout: true
-                    ).trim()
+        script {
+            env.IMAGE_TAG = sh(
+                script: 'git rev-parse --short=8 HEAD',
+                returnStdout: true
+            ).trim()
 
-                    echo "Building image tag: ${env.IMAGE_TAG}"
-                }
-            }
+            echo "Building image tag: ${env.IMAGE_TAG}"
         }
 
+        echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+        echo "GIT_BRANCH: ${env.GIT_BRANCH}"
+        echo "IMAGE_TAG: ${env.IMAGE_TAG}"
+    }
+}
         stage('Install Tools') {
     steps {
         container('tools') {
