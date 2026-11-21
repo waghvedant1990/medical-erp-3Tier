@@ -2,7 +2,7 @@
 pipeline {
     agent {
         kubernetes {
-            yaml '''
+    yaml '''
 apiVersion: v1
 kind: Pod
 spec:
@@ -38,9 +38,11 @@ spec:
     command: ["cat"]
     tty: true
 
-  
+  volumes:
+  - name: maven-cache
+    emptyDir: {}
 '''
-        }
+}
     }
 
     environment {
