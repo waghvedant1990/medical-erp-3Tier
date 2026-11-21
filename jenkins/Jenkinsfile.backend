@@ -249,7 +249,7 @@ stage('SonarCloud Analysis') {
                             services.each { svc ->
 
                                 def imageName =
-                                    "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}""
+                                    "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}"
 
                                 def latestImage =
                                     "${env.ECR_REGISTRY}/med-erp/${svc}:latest"
@@ -300,7 +300,7 @@ stage('SonarCloud Analysis') {
                                       --exit-code 1 \
                                       --severity HIGH,CRITICAL \
                                       --no-progress \
-                                      ${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG}
+                                      ${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}
                                 """
                             }
                         }
