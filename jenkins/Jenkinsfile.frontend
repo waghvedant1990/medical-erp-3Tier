@@ -40,19 +40,21 @@ spec:
                     url: 'https://github.com/waghvedant1990/medical-erp-3Tier.git'
             }
         }
-
+      
         stage('Install Dependencies') {
             steps {
                 container('node') {
                     dir('frontend') {
                         sh '''
                             echo "Installing frontend dependencies..."
-                            npm ci --prefer-offline
+                            npm install --no-audit --no-fund
                         '''
                     }
                 }
             }
         }
+        }
+    }
 
         stage('Lint') {
             steps {
