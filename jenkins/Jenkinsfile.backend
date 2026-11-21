@@ -249,10 +249,10 @@ stage('SonarCloud Analysis') {
                             services.each { svc ->
 
                                 def imageName =
-                                    "${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG}"
+                                    "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}""
 
                                 def latestImage =
-                                    "${ECR_REGISTRY}/med-erp/${svc}:latest"
+                                    "${env.ECR_REGISTRY}/med-erp/${svc}:latest"
 
                                 sh """
                                     docker build \
