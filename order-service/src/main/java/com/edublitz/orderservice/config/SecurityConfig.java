@@ -35,16 +35,16 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-        .requestMatchers(
-                "/actuator/health",
-                "/actuator/health/**",
-                "/api-docs/**",
-                "/swagger-ui/**"
-        ).permitAll()
-        .anyRequest().authenticated()
-)
-                )
+                 .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(
+                            "/actuator/health",
+                            "/actuator/health/**",
+                            "/api-docs/**",
+                            "/swagger-ui/**"
+                    ).permitAll()
+                    .anyRequest().authenticated()
+            )
+                
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
