@@ -48,7 +48,7 @@ spec:
         AWS_ACCOUNT_ID = '259072552887'
         ECR_REGISTRY  = '259072552887.dkr.ecr.us-east-1.amazonaws.com'
 
-        EKS_CLUSTER   = 'med-erp-prod-eks'
+        EKS_CLUSTER   = 'med-erp-dev-eks'
         K8S_NAMESPACE = 'med-erp'
 
         IMAGE_TAG = ''
