@@ -3,7 +3,7 @@ variable "kubernetes_version"     { type = string; default = "1.30" }
 variable "vpc_id"                 { type = string }
 variable "vpc_cidr"               { type = string }
 variable "private_subnet_ids"     { type = list(string) }
-variable "node_instance_types"    { type = list(string); default = ["m5.large"] }
+variable "node_instance_types"    { type = list(string); default = ["m7i-flex.large"] }
 variable "capacity_type"          { type = string; default = "ON_DEMAND" }
 variable "node_desired_count"     { type = number; default = 2 }
 variable "node_min_count"         { type = number; default = 1 }

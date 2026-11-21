@@ -29,7 +29,7 @@ spec:
 
     environment {
         AWS_REGION               = 'us-east-1'
-        S3_BUCKET_NAME           = 'med-erp-frontend-prod'
+        S3_BUCKET_NAME           = 'med-erp-frontend-dev-vedant-2026'
         CLOUDFRONT_DISTRIBUTION  = "${env.CLOUDFRONT_DISTRIBUTION_ID}"
     }
 
@@ -72,8 +72,8 @@ spec:
                 container('node') {
                     dir('frontend') {
                         withEnv([
-                            "VITE_USER_SERVICE_URL=https://api.med-erp.${env.DOMAIN_NAME}/api/v1",
-                            "VITE_PRODUCT_SERVICE_URL=https://api.med-erp.${env.DOMAIN_NAME}/api/v1",
+                            "VITE_USER_SERVICE_URL=https://api.${env.DOMAIN_NAME}/api/v1",
+                            "VITE_PRODUCT_SERVICE_URL=https://api.${env.DOMAIN_NAME}/api/v1",
                             "VITE_ORDER_SERVICE_URL=https://api.med-erp.${env.DOMAIN_NAME}/api/v1"
                         ]) {
                             sh 'npm run build'

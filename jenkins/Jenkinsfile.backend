@@ -1,12 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Jenkins Pipeline — Backend Microservices CI/CD
-// Triggered on: push to main or feature/* branches
-//
-// Credentials required (configure in Jenkins → Manage Credentials):
-//   AWS_CREDENTIALS       — AWS Access Key + Secret (type: AWS Credentials)
-//   SONARCLOUD_TOKEN      — SonarCloud API token (type: Secret Text)
-//   KUBECONFIG_CREDENTIAL — kubeconfig file (type: Secret File)
-// ─────────────────────────────────────────────────────────────────────────────
 
 pipeline {
     agent {
@@ -17,27 +8,36 @@ kind: Pod
 spec:
   containers:
   - name: maven
-    image: maven:3.9-eclipse-temurin-17-alpine
-    command: [cat]
+    image: maven:3.9-eclipse-temurin-17
+    command: ["cat"]
     tty: true
     volumeMounts:
     - name: maven-cache
       mountPath: /root/.m2
+
+  - name: tools
+    image: alpine:3.20
+    command: ["cat"]
+    tty: true
+    env:
+    - name: DOCKER_HOST
+      value: "tcp://localhost:2375"
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+
   - name: docker
-    image: docker:24-dind
+    image: docker:27-dind
     securityContext:
       privileged: true
     env:
     - name: DOCKER_TLS_CERTDIR
       value: ""
+
   - name: trivy
     image: aquasec/trivy:latest
-    command: [cat]
+    command: ["cat"]
     tty: true
-  - name: kubectl
-    image: bitnami/kubectl:latest
-    command: [cat]
-    tty: true
+
   volumes:
   - name: maven-cache
     persistentVolumeClaim:
@@ -47,12 +47,14 @@ spec:
     }
 
     environment {
-        AWS_REGION     = 'us-east-1'
-        ECR_REGISTRY   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        EKS_CLUSTER    = 'med-erp-prod-eks'
-        K8S_NAMESPACE  = 'med-erp'
-        IMAGE_TAG      = "${env.GIT_COMMIT.take(8)}"
-        SERVICES       = 'user-service product-service order-service'
+        AWS_REGION    = 'us-east-1'
+        AWS_ACCOUNT_ID = '259072552887'
+        ECR_REGISTRY  = '259072552887.dkr.ecr.us-east-1.amazonaws.com'
+
+        EKS_CLUSTER   = 'med-erp-prod-eks'
+        K8S_NAMESPACE = 'med-erp'
+
+        IMAGE_TAG = ''
     }
 
     options {
@@ -66,42 +68,66 @@ spec:
         stage('Checkout') {
             steps {
                 checkout scm
+
                 script {
-                    env.GIT_COMMIT_MSG = sh(
-                        script: 'git log -1 --format=%s',
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse --short=8 HEAD',
                         returnStdout: true
                     ).trim()
+
+                    echo "Building image tag: ${env.IMAGE_TAG}"
                 }
             }
         }
 
-        stage('Build & Test') {
+        stage('Install Tools') {
+            steps {
+                container('tools') {
+                    sh '''
+                        apk add --no-cache \
+                          docker-cli \
+                          aws-cli \
+                          kubectl \
+                          curl
+                    '''
+
+                    sh 'docker version'
+                    sh 'aws --version'
+                    sh 'kubectl version --client'
+                }
+            }
+        }
+
+        stage('Build and Test') {
             parallel {
-                stage('user-service') {
+
+                stage('User Service') {
                     steps {
                         container('maven') {
                             dir('user-service') {
-                                sh 'mvn clean verify -B -q'
+                                sh 'mvn clean verify -B'
                                 junit 'target/surefire-reports/*.xml'
                             }
                         }
                     }
                 }
-                stage('product-service') {
+
+                stage('Product Service') {
                     steps {
                         container('maven') {
                             dir('product-service') {
-                                sh 'mvn clean verify -B -q'
+                                sh 'mvn clean verify -B'
                                 junit 'target/surefire-reports/*.xml'
                             }
                         }
                     }
                 }
-                stage('order-service') {
+
+                stage('Order Service') {
                     steps {
                         container('maven') {
                             dir('order-service') {
-                                sh 'mvn clean verify -B -q'
+                                sh 'mvn clean verify -B'
                                 junit 'target/surefire-reports/*.xml'
                             }
                         }
@@ -110,56 +136,91 @@ spec:
             }
         }
 
-        stage('SonarCloud Quality Gate') {
-            when { branch 'main' }
-            steps {
-                withCredentials([string(credentialsId: 'SONARCLOUD_TOKEN', variable: 'SONAR_TOKEN')]) {
-                    container('maven') {
-                        script {
-                            ['user-service', 'product-service', 'order-service'].each { svc ->
-                                dir(svc) {
-                                    sh """
-                                        mvn sonar:sonar \
-                                          -Dsonar.projectKey=edublitz-med-erp-${svc} \
-                                          -Dsonar.organization=edublitz \
-                                          -Dsonar.host.url=https://sonarcloud.io \
-                                          -Dsonar.login=${SONAR_TOKEN} \
-                                          -Dsonar.qualitygate.wait=true \
-                                          -B -q
-                                    """
-                                }
-                            }
-                        }
-                    }
-                }
+           
+stage('SonarCloud Analysis') {
+    when {
+        branch 'main'
+    }
+
+    steps {
+        withCredentials([
+            string(
+                credentialsId: 'SONARCLOUD_TOKEN',
+                variable: 'SONAR_TOKEN'
+            )
+        ]) {
+            container('maven') {
+                sh """
+                    mvn sonar:sonar \
+                      -Dsonar.projectKey=waghvedant1990_medical-erp-3Tier \
+                      -Dsonar.organization=waghvedant1990 \
+                      -Dsonar.host.url=https://sonarcloud.io \
+                      -Dsonar.token=\$SONAR_TOKEN \
+                      -Dsonar.qualitygate.wait=true \
+                      -B
+                """
             }
         }
+    }
+}
 
-        stage('Docker Build & Push') {
-            when { branch 'main' }
+        stage('Docker Build and Push') {
+            when {
+                branch 'main'
+            }
+
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'AWS_CREDENTIALS',
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
-                    container('docker') {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'AWS_CREDENTIALS',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    container('tools') {
                         script {
-                            // ECR login
-                            sh """
-                                aws ecr get-login-password --region ${AWS_REGION} | \
-                                docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                            """
+                            sh '''
+                                echo "Waiting for Docker daemon..."
 
-                            ['user-service', 'product-service', 'order-service'].each { svc ->
-                                def imageName = "${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG}"
-                                def imageLatest = "${ECR_REGISTRY}/med-erp/${svc}:latest"
+                                for i in $(seq 1 30); do
+                                  if docker info >/dev/null 2>&1; then
+                                    break
+                                  fi
+                                  sleep 2
+                                done
+
+                                docker info
+
+                                aws ecr get-login-password \
+                                  --region "$AWS_REGION" |
+                                docker login \
+                                  --username AWS \
+                                  --password-stdin "$ECR_REGISTRY"
+                            '''
+
+                            def services = [
+                                'user-service',
+                                'product-service',
+                                'order-service'
+                            ]
+
+                            services.each { svc ->
+
+                                def imageName =
+                                    "${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG}"
+
+                                def latestImage =
+                                    "${ECR_REGISTRY}/med-erp/${svc}:latest"
 
                                 sh """
-                                    docker build -t ${imageName} -t ${imageLatest} ${svc}/
+                                    docker build \
+                                      -t ${imageName} \
+                                      -t ${latestImage} \
+                                      ${svc}/
+
                                     docker push ${imageName}
-                                    docker push ${imageLatest}
+                                    docker push ${latestImage}
                                 """
                             }
                         }
@@ -169,31 +230,12 @@ spec:
         }
 
         stage('Trivy Security Scan') {
-            when { branch 'main' }
-            steps {
-                container('trivy') {
-                    script {
-                        ['user-service', 'product-service', 'order-service'].each { svc ->
-                            sh """
-                                trivy image \
-                                  --exit-code 1 \
-                                  --severity HIGH,CRITICAL \
-                                  --no-progress \
-                                  --format table \
-                                  ${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG} \
-                                || (echo "Trivy found HIGH/CRITICAL vulnerabilities in ${svc}" && exit 1)
-                            """
-                        }
-                    }
-                }
+            when {
+                branch 'main'
             }
-        }
 
-        stage('Deploy to EKS') {
-            when { branch 'main' }
             steps {
                 withCredentials([
-                    file(credentialsId: 'KUBECONFIG_CREDENTIAL', variable: 'KUBECONFIG'),
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: 'AWS_CREDENTIALS',
@@ -201,19 +243,71 @@ spec:
                         secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                     ]
                 ]) {
-                    container('kubectl') {
+                    container('trivy') {
                         script {
-                            // Update kubeconfig for EKS
-                            sh "aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}"
+                            def services = [
+                                'user-service',
+                                'product-service',
+                                'order-service'
+                            ]
 
-                            ['user-service', 'product-service', 'order-service'].each { svc ->
+                            services.each { svc ->
+
                                 sh """
-                                    kubectl set image deployment/${svc} \
+                                    trivy image \
+                                      --scanners vuln \
+                                      --exit-code 1 \
+                                      --severity HIGH,CRITICAL \
+                                      --no-progress \
+                                      ${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG}
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'AWS_CREDENTIALS',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    container('tools') {
+                        script {
+                            sh """
+                                aws eks update-kubeconfig \
+                                  --region ${AWS_REGION} \
+                                  --name ${EKS_CLUSTER}
+                            """
+
+                            def services = [
+                                'user-service',
+                                'product-service',
+                                'order-service'
+                            ]
+
+                            services.each { svc ->
+
+                                sh """
+                                    kubectl set image \
+                                      deployment/${svc} \
                                       ${svc}=${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG} \
                                       -n ${K8S_NAMESPACE}
 
-                                    kubectl rollout status deployment/${svc} \
-                                      -n ${K8S_NAMESPACE} --timeout=5m
+                                    kubectl rollout status \
+                                      deployment/${svc} \
+                                      -n ${K8S_NAMESPACE} \
+                                      --timeout=300s
                                 """
                             }
                         }
@@ -225,11 +319,14 @@ spec:
 
     post {
         success {
-            echo "Pipeline succeeded. Image tag: ${IMAGE_TAG}"
+            echo "CI/CD Pipeline completed successfully!"
+            echo "Docker Image Tag: ${IMAGE_TAG}"
         }
+
         failure {
-            echo "Pipeline failed. Check logs above."
+            echo "CI/CD Pipeline failed. Check Jenkins console logs."
         }
+
         always {
             cleanWs()
         }
