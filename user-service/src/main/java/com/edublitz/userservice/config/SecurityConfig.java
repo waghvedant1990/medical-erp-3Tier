@@ -39,13 +39,14 @@ public class SecurityConfig {
     private String[] allowedOrigins;
 
     private static final String[] PUBLIC_ENDPOINTS = {
-            "/auth/**",
-            "/actuator/health",
-            "/actuator/info",
-            "/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-    };
+        "/auth/**",
+        "/actuator/health",
+        "/actuator/health/**",
+        "/actuator/info",
+        "/api-docs/**",
+        "/swagger-ui/**",
+        "/swagger-ui.html"
+};
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
