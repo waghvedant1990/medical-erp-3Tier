@@ -3,6 +3,7 @@ pipeline {
     agent {
         kubernetes {
     yaml '''
+
 apiVersion: v1
 kind: Pod
 spec:
@@ -11,11 +12,8 @@ spec:
     image: maven:3.9-eclipse-temurin-17
     command: ["cat"]
     tty: true
-    volumeMounts:
-    - name: maven-cache
-      mountPath: /root/.m2
 
-    - name: tools
+  - name: tools
     image: alpine:3.20
     command: ["cat"]
     tty: true
@@ -29,6 +27,12 @@ spec:
     image: docker:27-dind
     securityContext:
       privileged: true
+    command:
+    - dockerd
+    args:
+    - --host=tcp://0.0.0.0:2375
+    - --host=unix:///var/run/docker.sock
+    - --tls=false
     env:
     - name: DOCKER_TLS_CERTDIR
       value: ""
@@ -38,9 +42,7 @@ spec:
     command: ["cat"]
     tty: true
 
-  volumes:
-  - name: maven-cache
-    emptyDir: {}
+ 
 '''
 }
     }
