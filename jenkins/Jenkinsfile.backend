@@ -74,25 +74,29 @@ spec:
 
         
 
+
 stage('Checkout') {
     steps {
-        checkout scm
-
         script {
-            env.IMAGE_TAG = sh(
-                script: 'git rev-parse --short=8 HEAD',
+            // Jenkins has already checked out the SCM revision.
+            // Read the commit directly from the checked-out workspace.
+            def commitId = sh(
+                script: 'git rev-parse HEAD',
                 returnStdout: true
             ).trim()
 
-            if (!env.IMAGE_TAG || env.IMAGE_TAG == 'null') {
-                error('Unable to generate Docker image tag from Git commit')
+            if (!commitId || commitId.length() < 8) {
+                error("Unable to generate Docker image tag. Commit ID: ${commitId}")
             }
 
-            echo "Git commit: ${sh(script: 'git rev-parse HEAD', returnStdout: true).trim()}"
+            env.IMAGE_TAG = commitId.take(8)
+
+            echo "Git commit: ${commitId}"
             echo "Docker image tag: ${env.IMAGE_TAG}"
         }
     }
 }
+
 
 
         // -----------------------------------------
