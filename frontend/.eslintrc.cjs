@@ -1,4 +1,3 @@
-@'
 module.exports = {
   root: true,
   env: {
@@ -12,11 +11,6 @@ module.exports = {
     sourceType: 'module',
     ecmaFeatures: {
       jsx: true
-    }
-  },
-  settings: {
-    react: {
-      version: 'detect'
     }
   },
   plugins: [
@@ -33,4 +27,3 @@ module.exports = {
     'react-refresh/only-export-components': 'off'
   }
 };
-'@ | Set-Content -Path frontend/.eslintrc.cjs
