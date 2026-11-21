@@ -1,0 +1,8 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Docker secrets
+docker/.env
+docker/.env.backup
