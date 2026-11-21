@@ -111,16 +111,23 @@ spec:
         }
     }
 }
-        stage('Build and Test') {
+       
+stage('Build and Test') {
     parallel {
         stage('User Service') {
             steps {
                 dir('user-service') {
                     container('maven') {
-                        sh 'mvn clean verify'
+                        sh '''
+                            mvn -B clean verify
+
+                            echo "User Service test reports:"
+                            find target -type f -name "TEST-*.xml" || true
+                        '''
                     }
+
                     junit(
-                        testResults: 'target/surefire-reports/TEST-*.xml',
+                        testResults: '**/target/surefire-reports/TEST-*.xml',
                         allowEmptyResults: true
                     )
                 }
@@ -131,10 +138,16 @@ spec:
             steps {
                 dir('product-service') {
                     container('maven') {
-                        sh 'mvn clean verify'
+                        sh '''
+                            mvn -B clean verify
+
+                            echo "Product Service test reports:"
+                            find target -type f -name "TEST-*.xml" || true
+                        '''
                     }
+
                     junit(
-                        testResults: 'target/surefire-reports/TEST-*.xml',
+                        testResults: '**/target/surefire-reports/TEST-*.xml',
                         allowEmptyResults: true
                     )
                 }
@@ -145,10 +158,16 @@ spec:
             steps {
                 dir('order-service') {
                     container('maven') {
-                        sh 'mvn clean verify'
+                        sh '''
+                            mvn -B clean verify
+
+                            echo "Order Service test reports:"
+                            find target -type f -name "TEST-*.xml" || true
+                        '''
                     }
+
                     junit(
-                        testResults: 'target/surefire-reports/TEST-*.xml',
+                        testResults: '**/target/surefire-reports/TEST-*.xml',
                         allowEmptyResults: true
                     )
                 }
@@ -156,6 +175,7 @@ spec:
         }
     }
 }
+
 
            
 stage('SonarCloud Analysis') {
