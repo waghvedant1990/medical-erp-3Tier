@@ -72,25 +72,30 @@ spec:
         // 1. CHECKOUT
         // -----------------------------------------
 
-        stage('Checkout') {
-            steps {
-                checkout scm
+        
+stage('Checkout') {
+    steps {
+        script {
+            def scmInfo = checkout scm
 
-                script {
-                    env.IMAGE_TAG = sh(
-                        script: 'git rev-parse --short=8 HEAD',
-                        returnStdout: true
-                    ).trim()
+            def commitId = scmInfo.GIT_COMMIT
 
-                    if (!env.IMAGE_TAG) {
-                        error('IMAGE_TAG generation failed')
-                    }
-
-                    echo "Branch: ${env.GIT_BRANCH}"
-                    echo "Commit: ${env.IMAGE_TAG}"
-                }
+            if (!commitId) {
+                commitId = env.GIT_COMMIT
             }
+
+            if (!commitId) {
+                error('Unable to retrieve Git commit ID')
+            }
+
+            env.IMAGE_TAG = commitId.take(8)
+
+            echo "Git commit: ${commitId}"
+            echo "Docker image tag: ${env.IMAGE_TAG}"
         }
+    }
+}
+
 
         // -----------------------------------------
         // 2. INSTALL TOOLS
