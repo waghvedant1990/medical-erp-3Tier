@@ -6,10 +6,9 @@ server:
 spring:
   application:
     name: user-service
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/users_db}
-      database: users_db
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/user_db}
+    database: user_db
   jackson:
     default-property-inclusion: non_null
     

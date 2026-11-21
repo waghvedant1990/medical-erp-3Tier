@@ -6,10 +6,9 @@ server:
 spring:
   application:
     name: order-service
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/orders_db}
-      database: orders_db
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/order_db}
+    database: order_db
   jackson:
     default-property-inclusion: non_null
     
