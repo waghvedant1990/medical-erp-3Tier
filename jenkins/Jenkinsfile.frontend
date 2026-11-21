@@ -1,11 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Jenkins Pipeline — Frontend CI/CD (React → S3 → CloudFront)
-//
-// Credentials required:
-//   AWS_CREDENTIALS — AWS Access Key + Secret
-// Environment variables (set at Jenkins system or pipeline level):
-//   S3_BUCKET_NAME, CLOUDFRONT_DISTRIBUTION_ID, VITE_*
-// ─────────────────────────────────────────────────────────────────────────────
 
 pipeline {
     agent {
@@ -18,30 +10,19 @@ spec:
   containers:
     - name: node
       image: node:20-alpine
-      command:
-        - cat
+      command: ["cat"]
       tty: true
 
     - name: aws-cli
       image: amazon/aws-cli:latest
-      command:
-        - sh
-        - -c
-        - cat
+      command: ["sh", "-c", "cat"]
       tty: true
 '''
         }
     }
-    options {
-    skipDefaultCheckout(true)
-}
 
-stages {
-    stage('Checkout') {
-        steps {
-            git branch: 'main',
-                url: 'https://github.com/waghvedant1990/medical-erp-3Tier.git'
-        }
+    options {
+        skipDefaultCheckout(true)
     }
 
     environment {
@@ -55,7 +36,8 @@ stages {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main',
+                    url: 'https://github.com/waghvedant1990/medical-erp-3Tier.git'
             }
         }
 
