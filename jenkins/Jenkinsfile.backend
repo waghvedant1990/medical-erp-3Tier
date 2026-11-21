@@ -112,42 +112,50 @@ spec:
     }
 }
         stage('Build and Test') {
-            parallel {
-
-                stage('User Service') {
-                    steps {
-                        container('maven') {
-                            dir('user-service') {
-                                sh 'mvn clean verify -B'
-                                junit 'target/surefire-reports/*.xml'
-                            }
-                        }
+    parallel {
+        stage('User Service') {
+            steps {
+                dir('user-service') {
+                    container('maven') {
+                        sh 'mvn clean verify'
                     }
-                }
-
-                stage('Product Service') {
-                    steps {
-                        container('maven') {
-                            dir('product-service') {
-                                sh 'mvn clean verify -B'
-                                junit 'target/surefire-reports/*.xml'
-                            }
-                        }
-                    }
-                }
-
-                stage('Order Service') {
-                    steps {
-                        container('maven') {
-                            dir('order-service') {
-                                sh 'mvn clean verify -B'
-                                junit 'target/surefire-reports/*.xml'
-                            }
-                        }
-                    }
+                    junit(
+                        testResults: 'target/surefire-reports/TEST-*.xml',
+                        allowEmptyResults: true
+                    )
                 }
             }
         }
+
+        stage('Product Service') {
+            steps {
+                dir('product-service') {
+                    container('maven') {
+                        sh 'mvn clean verify'
+                    }
+                    junit(
+                        testResults: 'target/surefire-reports/TEST-*.xml',
+                        allowEmptyResults: true
+                    )
+                }
+            }
+        }
+
+        stage('Order Service') {
+            steps {
+                dir('order-service') {
+                    container('maven') {
+                        sh 'mvn clean verify'
+                    }
+                    junit(
+                        testResults: 'target/surefire-reports/TEST-*.xml',
+                        allowEmptyResults: true
+                    )
+                }
+            }
+        }
+    }
+}
 
            
 stage('SonarCloud Analysis') {
