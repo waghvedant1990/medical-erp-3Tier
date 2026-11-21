@@ -15,7 +15,7 @@ spec:
     - name: maven-cache
       mountPath: /root/.m2
 
-  - name: tools
+    - name: tools
     image: alpine:3.20
     command: ["cat"]
     tty: true
@@ -23,7 +23,7 @@ spec:
     - name: DOCKER_HOST
       value: "tcp://localhost:2375"
     - name: DOCKER_TLS_CERTDIR
-      value: ""
+      value: """
 
   - name: docker
     image: docker:27-dind
@@ -80,23 +80,35 @@ spec:
         }
 
         stage('Install Tools') {
-            steps {
-                container('tools') {
-                    sh '''
-                        apk add --no-cache \
-                          docker-cli \
-                          aws-cli \
-                          kubectl \
-                          curl
-                    '''
+    steps {
+        container('tools') {
+            sh '''
+                apk add --no-cache \
+                  docker-cli \
+                  aws-cli \
+                  kubectl \
+                  curl
 
-                    sh 'docker version'
-                    sh 'aws --version'
-                    sh 'kubectl version --client'
-                }
-            }
+                echo "Waiting for Docker daemon..."
+
+                for i in $(seq 1 30); do
+                    if docker info >/dev/null 2>&1; then
+                        echo "Docker daemon is ready!"
+                        docker version
+                        break
+                    fi
+
+                    echo "Waiting for Docker... ($i/30)"
+                    sleep 2
+                done
+
+                docker info
+                aws --version
+                kubectl version --client
+            '''
         }
-
+    }
+}
         stage('Build and Test') {
             parallel {
 
