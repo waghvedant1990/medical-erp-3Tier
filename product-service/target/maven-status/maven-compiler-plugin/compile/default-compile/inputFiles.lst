@@ -1,0 +1,16 @@
+/app/src/main/java/com/edublitz/productservice/ProductServiceApplication.java
+/app/src/main/java/com/edublitz/productservice/config/OpenApiConfig.java
+/app/src/main/java/com/edublitz/productservice/config/SecurityConfig.java
+/app/src/main/java/com/edublitz/productservice/controller/ProductController.java
+/app/src/main/java/com/edublitz/productservice/dto/ProductRequest.java
+/app/src/main/java/com/edublitz/productservice/dto/StockUpdateRequest.java
+/app/src/main/java/com/edublitz/productservice/exception/BadRequestException.java
+/app/src/main/java/com/edublitz/productservice/exception/GlobalExceptionHandler.java
+/app/src/main/java/com/edublitz/productservice/exception/ResourceNotFoundException.java
+/app/src/main/java/com/edublitz/productservice/model/InventoryItem.java
+/app/src/main/java/com/edublitz/productservice/model/Product.java
+/app/src/main/java/com/edublitz/productservice/repository/InventoryRepository.java
+/app/src/main/java/com/edublitz/productservice/repository/ProductRepository.java
+/app/src/main/java/com/edublitz/productservice/security/JwtAuthenticationFilter.java
+/app/src/main/java/com/edublitz/productservice/security/JwtService.java
+/app/src/main/java/com/edublitz/productservice/service/ProductService.java

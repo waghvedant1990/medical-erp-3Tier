@@ -1,0 +1,15 @@
+/app/src/main/java/com/edublitz/orderservice/OrderServiceApplication.java
+/app/src/main/java/com/edublitz/orderservice/client/ProductServiceClient.java
+/app/src/main/java/com/edublitz/orderservice/config/OpenApiConfig.java
+/app/src/main/java/com/edublitz/orderservice/config/SecurityConfig.java
+/app/src/main/java/com/edublitz/orderservice/config/WebClientConfig.java
+/app/src/main/java/com/edublitz/orderservice/controller/OrderController.java
+/app/src/main/java/com/edublitz/orderservice/dto/CreateOrderRequest.java
+/app/src/main/java/com/edublitz/orderservice/exception/BadRequestException.java
+/app/src/main/java/com/edublitz/orderservice/exception/GlobalExceptionHandler.java
+/app/src/main/java/com/edublitz/orderservice/exception/ResourceNotFoundException.java
+/app/src/main/java/com/edublitz/orderservice/model/Order.java
+/app/src/main/java/com/edublitz/orderservice/repository/OrderRepository.java
+/app/src/main/java/com/edublitz/orderservice/security/JwtAuthenticationFilter.java
+/app/src/main/java/com/edublitz/orderservice/security/JwtService.java
+/app/src/main/java/com/edublitz/orderservice/service/OrderService.java
