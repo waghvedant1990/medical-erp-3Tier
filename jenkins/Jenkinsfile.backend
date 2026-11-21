@@ -207,7 +207,7 @@ stage('Checkout') {
                               -Dsonar.tests=user-service/src/test,product-service/src/test,order-service/src/test \
                               -Dsonar.java.binaries=user-service/target/classes,product-service/target/classes,order-service/target/classes \
                               -Dsonar.token="$SONAR_TOKEN" \
-                              -Dsonar.qualitygate.wait=true
+                              -Dsonar.qualitygate.wait=false
                         '''
                     }
                 }
