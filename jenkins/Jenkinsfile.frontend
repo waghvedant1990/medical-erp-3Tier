@@ -12,7 +12,6 @@ spec:
       image: node:20-alpine
       command: ["cat"]
       tty: true
-
     - name: aws-cli
       image: amazon/aws-cli:latest
       command: ["sh", "-c", "cat"]
@@ -33,37 +32,31 @@ spec:
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 git branch: 'main',
+                    credentialsId: 'Github-Med-Erp',
                     url: 'https://github.com/waghvedant1990/medical-erp-3Tier.git'
             }
         }
-      
+
         stage('Install Dependencies') {
             steps {
                 container('node') {
                     dir('frontend') {
                         sh '''
-                            echo "Installing frontend dependencies..."
                             npm install --no-audit --no-fund
                         '''
                     }
                 }
             }
         }
-        }
-    }
 
         stage('Lint') {
             steps {
                 container('node') {
                     dir('frontend') {
-                        sh '''
-                            echo "Running frontend lint..."
-                            npm run lint
-                        '''
+                        sh 'npm run lint'
                     }
                 }
             }
@@ -78,10 +71,7 @@ spec:
                             "VITE_PRODUCT_SERVICE_URL=https://api.${DOMAIN_NAME}/api/v1",
                             "VITE_ORDER_SERVICE_URL=https://api.med-erp.${DOMAIN_NAME}/api/v1"
                         ]) {
-                            sh '''
-                                echo "Building frontend..."
-                                npm run build
-                            '''
+                            sh 'npm run build'
                         }
                     }
                 }
@@ -99,12 +89,8 @@ spec:
                          credentialsId: 'AWS_CREDENTIALS']
                     ]) {
                         sh '''
-                            echo "Uploading frontend build to S3..."
-
-                            aws s3 sync frontend/dist/ \
-                                s3://${S3_BUCKET_NAME}/ \
-                                --delete \
-                                --region ${AWS_REGION}
+                            aws s3 sync frontend/dist/ s3://${S3_BUCKET_NAME}/ \
+                                --delete --region ${AWS_REGION}
                         '''
                     }
                 }
@@ -122,8 +108,6 @@ spec:
                          credentialsId: 'AWS_CREDENTIALS']
                     ]) {
                         sh '''
-                            echo "Invalidating CloudFront cache..."
-
                             aws cloudfront create-invalidation \
                                 --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} \
                                 --paths "/*"
@@ -138,9 +122,8 @@ spec:
         success {
             echo 'Frontend pipeline completed successfully.'
         }
-
         failure {
-            echo 'Frontend pipeline failed. Check the Jenkins console output.'
+            echo 'Frontend pipeline failed. Check console output.'
         }
     }
 }
