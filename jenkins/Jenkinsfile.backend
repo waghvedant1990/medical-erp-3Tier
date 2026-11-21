@@ -358,18 +358,20 @@ stage('SonarCloud Analysis') {
         }
     }
 
-    post {
-        success {
-            echo "CI/CD Pipeline completed successfully!"
-            echo "Docker Image Tag: ${IMAGE_TAG}"
-        }
-
-        failure {
-            echo "CI/CD Pipeline failed. Check Jenkins console logs."
-        }
-
-        always {
-            cleanWs()
-        }
+    
+post {
+    success {
+        echo "CI/CD Pipeline completed successfully!"
+        echo "Docker Image Tag: ${env.IMAGE_TAG}"
     }
+
+    failure {
+        echo "CI/CD Pipeline failed. Check Jenkins console logs."
+    }
+
+    always {
+        cleanWs()
+    }
+}
+
 }
