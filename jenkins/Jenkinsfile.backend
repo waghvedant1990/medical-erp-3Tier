@@ -57,7 +57,7 @@ spec:
         EKS_CLUSTER    = 'med-erp-dev-eks'
         K8S_NAMESPACE  = 'med-erp'
 
-        IMAGE_TAG = ''
+        
     }
 
     options {
