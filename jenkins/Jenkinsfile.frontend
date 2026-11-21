@@ -32,6 +32,17 @@ spec:
 '''
         }
     }
+    options {
+    skipDefaultCheckout(true)
+}
+
+stages {
+    stage('Checkout') {
+        steps {
+            git branch: 'main',
+                url: 'https://github.com/waghvedant1990/medical-erp-3Tier.git'
+        }
+    }
 
     environment {
         AWS_REGION = 'us-east-1'
