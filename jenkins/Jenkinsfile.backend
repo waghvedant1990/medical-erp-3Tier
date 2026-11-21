@@ -73,24 +73,22 @@ spec:
         // -----------------------------------------
 
         
+
 stage('Checkout') {
     steps {
+        checkout scm
+
         script {
-            def scmInfo = checkout scm
+            env.IMAGE_TAG = sh(
+                script: 'git rev-parse --short=8 HEAD',
+                returnStdout: true
+            ).trim()
 
-            def commitId = scmInfo.GIT_COMMIT
-
-            if (!commitId) {
-                commitId = env.GIT_COMMIT
+            if (!env.IMAGE_TAG || env.IMAGE_TAG == 'null') {
+                error('Unable to generate Docker image tag from Git commit')
             }
 
-            if (!commitId) {
-                error('Unable to retrieve Git commit ID')
-            }
-
-            env.IMAGE_TAG = commitId.take(8)
-
-            echo "Git commit: ${commitId}"
+            echo "Git commit: ${sh(script: 'git rev-parse HEAD', returnStdout: true).trim()}"
             echo "Docker image tag: ${env.IMAGE_TAG}"
         }
     }
