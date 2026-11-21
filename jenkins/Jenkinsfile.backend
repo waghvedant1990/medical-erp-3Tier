@@ -312,53 +312,58 @@ stage('SonarCloud Analysis') {
             }
         }
 
-        stage('Deploy to EKS') {
-            when {
-                branch 'main'
-            }
+        
+stage('Deploy to EKS') {
+    when {
+        expression {
+            env.BRANCH_NAME == 'main' ||
+            env.GIT_BRANCH == 'origin/main' ||
+            env.GIT_BRANCH == 'main'
+        }
+    }
 
-            steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'AWS_CREDENTIALS',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+    steps {
+        withCredentials([
+            [
+                $class: 'AmazonWebServicesCredentialsBinding',
+                credentialsId: 'AWS_CREDENTIALS',
+                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+            ]
+        ]) {
+            container('tools') {
+                script {
+                    sh """
+                        aws eks update-kubeconfig \
+                          --region ${env.AWS_REGION} \
+                          --name ${env.EKS_CLUSTER}
+                    """
+
+                    def services = [
+                        'user-service',
+                        'product-service',
+                        'order-service'
                     ]
-                ]) {
-                    container('tools') {
-                        script {
-                            sh """
-                                aws eks update-kubeconfig \
-                                  --region ${AWS_REGION} \
-                                  --name ${EKS_CLUSTER}
-                            """
 
-                            def services = [
-                                'user-service',
-                                'product-service',
-                                'order-service'
-                            ]
+                    services.each { svc ->
+                        sh """
+                            kubectl set image \
+                              deployment/${svc} \
+                              ${svc}=${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG} \
+                              -n ${env.K8S_NAMESPACE}
 
-                            services.each { svc ->
-
-                                sh """
-                                    kubectl set image \
-                                      deployment/${svc} \
-                                      ${svc}=${ECR_REGISTRY}/med-erp/${svc}:${IMAGE_TAG} \
-                                      -n ${K8S_NAMESPACE}
-
-                                    kubectl rollout status \
-                                      deployment/${svc} \
-                                      -n ${K8S_NAMESPACE} \
-                                      --timeout=300s
-                                """
-                            }
-                        }
+                            kubectl rollout status \
+                              deployment/${svc} \
+                              -n ${env.K8S_NAMESPACE} \
+                              --timeout=300s
+                        """
                     }
                 }
             }
         }
+    }
+}
+
     }
 
     
