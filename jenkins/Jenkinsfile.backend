@@ -314,53 +314,45 @@ stage('SonarCloud Analysis') {
 
         
 stage('Deploy to EKS') {
-    when {
-        expression {
-            env.BRANCH_NAME == 'main' ||
-            env.GIT_BRANCH == 'origin/main' ||
-            env.GIT_BRANCH == 'main'
-        }
-    }
-
     steps {
-        withCredentials([
-            [
-                $class: 'AmazonWebServicesCredentialsBinding',
-                credentialsId: 'AWS_CREDENTIALS',
-                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-            ]
-        ]) {
-            container('tools') {
-                script {
-                    sh """
-                        aws eks update-kubeconfig \
-                          --region ${env.AWS_REGION} \
-                          --name ${env.EKS_CLUSTER}
-                    """
-
-                    def services = [
-                        'user-service',
-                        'product-service',
-                        'order-service'
-                    ]
-
-                    services.each { svc ->
-                        sh """
-                            kubectl set image \
-                              deployment/${svc} \
-                              ${svc}=${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG} \
-                              -n ${env.K8S_NAMESPACE}
-
-                            kubectl rollout status \
-                              deployment/${svc} \
-                              -n ${env.K8S_NAMESPACE} \
-                              --timeout=300s
-                        """
-                    }
+        container('tools') {
+            script {
+                if (!env.IMAGE_TAG?.trim()) {
+                    error("IMAGE_TAG is missing")
                 }
+
+                sh """
+                    aws eks update-kubeconfig \
+                      --region ${AWS_REGION} \
+                      --name ${EKS_CLUSTER}
+
+                    kubectl apply -f k8s/ -n ${K8S_NAMESPACE}
+
+                    kubectl set image deployment/user-service \
+                      user-service=${ECR_REGISTRY}/med-erp/user-service:${IMAGE_TAG} \
+                      -n ${K8S_NAMESPACE}
+
+                    kubectl set image deployment/product-service \
+                      product-service=${ECR_REGISTRY}/med-erp/product-service:${IMAGE_TAG} \
+                      -n ${K8S_NAMESPACE}
+
+                    kubectl set image deployment/order-service \
+                      order-service=${ECR_REGISTRY}/med-erp/order-service:${IMAGE_TAG} \
+                      -n ${K8S_NAMESPACE}
+
+                    kubectl rollout status deployment/user-service \
+                      -n ${K8S_NAMESPACE} --timeout=300s
+
+                    kubectl rollout status deployment/product-service \
+                      -n ${K8S_NAMESPACE} --timeout=300s
+
+                    kubectl rollout status deployment/order-service \
+                      -n ${K8S_NAMESPACE} --timeout=300s
+                """
             }
         }
+    }
+}
     }
 }
 
