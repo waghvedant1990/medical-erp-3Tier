@@ -56,8 +56,6 @@ spec:
 
         EKS_CLUSTER    = 'med-erp-dev-eks'
         K8S_NAMESPACE  = 'med-erp'
-
-        
     }
 
     options {
@@ -69,35 +67,28 @@ spec:
     stages {
 
         // -----------------------------------------
-        // 1. CHECKOUT
+        // 1. CHECKOUT AND IMAGE TAG
         // -----------------------------------------
 
-        
+        stage('Checkout') {
+            steps {
+                script {
+                    def commitId = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
 
+                    if (!commitId || commitId.length() < 8) {
+                        error("Unable to generate Docker image tag")
+                    }
 
-stage('Checkout') {
-    steps {
-        script {
-            // Jenkins has already checked out the SCM revision.
-            // Read the commit directly from the checked-out workspace.
-            def commitId = sh(
-                script: 'git rev-parse HEAD',
-                returnStdout: true
-            ).trim()
+                    env.IMAGE_TAG = commitId.take(8)
 
-            if (!commitId || commitId.length() < 8) {
-                error("Unable to generate Docker image tag. Commit ID: ${commitId}")
+                    echo "Git commit: ${commitId}"
+                    echo "Docker image tag: ${env.IMAGE_TAG}"
+                }
             }
-
-            env.IMAGE_TAG = commitId.take(8)
-
-            echo "Git commit: ${commitId}"
-            echo "Docker image tag: ${env.IMAGE_TAG}"
         }
-    }
-}
-
-
 
         // -----------------------------------------
         // 2. INSTALL TOOLS
@@ -247,7 +238,6 @@ stage('Checkout') {
                             ]
 
                             services.each { svc ->
-
                                 def imageName =
                                     "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}"
 
@@ -295,7 +285,6 @@ stage('Checkout') {
                             ]
 
                             services.each { svc ->
-
                                 def imageName =
                                     "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}"
 
@@ -317,10 +306,10 @@ stage('Checkout') {
         }
 
         // -----------------------------------------
-        // 7. DEPLOY TO EKS
+        // 7. DEPLOY BACKEND TO EKS
         // -----------------------------------------
 
-        stage('Deploy to EKS') {
+        stage('Deploy Backend to EKS') {
             steps {
                 script {
                     if (!env.IMAGE_TAG?.trim()) {
@@ -344,10 +333,15 @@ stage('Checkout') {
                               --region "$AWS_REGION" \
                               --name "$EKS_CLUSTER"
 
-                            echo "Applying Kubernetes manifests..."
+                            echo "Applying namespace and backend manifests..."
 
-                            kubectl apply -R -f k8s/ \
-                              -n "$K8S_NAMESPACE"
+                            kubectl apply \
+                              -f k8s/namespace/ \
+                              -f k8s/configmaps/ \
+                              -f k8s/secrets/ \
+                              -f k8s/services/ \
+                              -f k8s/deployments/ \
+                              -f k8s/hpa/
                         '''
 
                         script {
@@ -358,7 +352,6 @@ stage('Checkout') {
                             ]
 
                             services.each { svc ->
-
                                 def imageName =
                                     "${env.ECR_REGISTRY}/med-erp/${svc}:${env.IMAGE_TAG}"
 
@@ -379,11 +372,101 @@ stage('Checkout') {
                         }
 
                         sh '''
-                            echo "Deployment verification"
+                            echo "Backend deployment verification"
 
                             kubectl get deployments -n "$K8S_NAMESPACE"
                             kubectl get pods -n "$K8S_NAMESPACE"
                             kubectl get services -n "$K8S_NAMESPACE"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // -----------------------------------------
+        // 8. DEPLOY AWS ALB INGRESS
+        // -----------------------------------------
+
+        stage('Deploy ALB Ingress') {
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'AWS_CREDENTIALS',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    container('tools') {
+                        sh '''
+                            echo "Connecting to EKS..."
+
+                            aws eks update-kubeconfig \
+                              --region "$AWS_REGION" \
+                              --name "$EKS_CLUSTER"
+
+                            echo "Validating Ingress manifest..."
+
+                            kubectl apply \
+                              --dry-run=client \
+                              -f k8s/ingress/ingress.yaml
+
+                            echo "Applying AWS ALB Ingress..."
+
+                            kubectl apply \
+                              -f k8s/ingress/ingress.yaml
+
+                            echo "Ingress resource status..."
+
+                            kubectl get ingress \
+                              med-erp-ingress \
+                              -n "$K8S_NAMESPACE"
+
+                            echo "Ingress details..."
+
+                            kubectl describe ingress \
+                              med-erp-ingress \
+                              -n "$K8S_NAMESPACE"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // -----------------------------------------
+        // 9. FINAL VERIFICATION
+        // -----------------------------------------
+
+        stage('Final Verification') {
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'AWS_CREDENTIALS',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    container('tools') {
+                        sh '''
+                            aws eks update-kubeconfig \
+                              --region "$AWS_REGION" \
+                              --name "$EKS_CLUSTER"
+
+                            echo "========== DEPLOYMENTS =========="
+                            kubectl get deployments -n "$K8S_NAMESPACE"
+
+                            echo "========== PODS =========="
+                            kubectl get pods -n "$K8S_NAMESPACE"
+
+                            echo "========== SERVICES =========="
+                            kubectl get services -n "$K8S_NAMESPACE"
+
+                            echo "========== INGRESS =========="
+                            kubectl get ingress -n "$K8S_NAMESPACE"
+
+                            echo "========== INGRESS CLASS =========="
+                            kubectl get ingressclass
                         '''
                     }
                 }
@@ -397,12 +480,13 @@ stage('Checkout') {
 
     post {
         success {
-            echo 'Medical ERP CI/CD completed successfully!'
+            echo 'Medical ERP backend CI/CD completed successfully!'
             echo "Docker Image Tag: ${env.IMAGE_TAG}"
+            echo 'Backend services and ALB Ingress deployment completed.'
         }
 
         failure {
-            echo 'Medical ERP CI/CD pipeline failed.'
+            echo 'Medical ERP backend CI/CD pipeline failed.'
             echo 'Check the failed stage in Jenkins console output.'
         }
 

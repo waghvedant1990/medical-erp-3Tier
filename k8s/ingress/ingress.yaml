@@ -1,42 +1,18 @@
-# AWS ALB Ingress Controller — routes external traffic to microservices
-# Prerequisites:
-#   - AWS Load Balancer Controller installed on EKS
-#   - ACM certificate ARN for your domain
-#   - Route53 hosted zone configured
-apiVersion: networking.k8s.io/v1
+﻿apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: med-erp-ingress
   namespace: med-erp
   annotations:
-    # ALB annotations
-    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/load-balancer-name: med-erp-alb
-
-    # HTTPS
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:259072552887:certificate/fea6bcd5-6c20-4e4b-b2f7-8e5f82a28aa0
-
-    # Health checks
-    alb.ingress.kubernetes.io/healthcheck-path: /api/v1/actuator/health
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
-
-    # WAF (optional)
-    # alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:...
-
-    # Security groups
-    alb.ingress.kubernetes.io/security-groups: sg-XXXXXXXXXX
-
-    # Tags
-    alb.ingress.kubernetes.io/tags: "Environment=production,Project=med-erp"
 spec:
+  ingressClassName: alb
   rules:
-    - host: api.med-erp.yourdomain.com
+    - host: api.vwtech.shop
       http:
         paths:
           - path: /api/v1/auth
@@ -46,6 +22,7 @@ spec:
                 name: user-service
                 port:
                   number: 8081
+
           - path: /api/v1/users
             pathType: Prefix
             backend:
@@ -53,6 +30,7 @@ spec:
                 name: user-service
                 port:
                   number: 8081
+
           - path: /api/v1/organizations
             pathType: Prefix
             backend:
@@ -60,6 +38,7 @@ spec:
                 name: user-service
                 port:
                   number: 8081
+
           - path: /api/v1/products
             pathType: Prefix
             backend:
@@ -67,6 +46,7 @@ spec:
                 name: product-service
                 port:
                   number: 8082
+
           - path: /api/v1/orders
             pathType: Prefix
             backend:
