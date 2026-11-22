@@ -1,0 +1,10 @@
+{
+  "endpointPublicAccess": true,
+  "endpointPrivateAccess": true,
+  "publicAccessCidrs": [
+    "157.32.114.20/32",
+    "52.90.247.206/32",
+    "223.233.81.230/32",
+    "157.32.138.36/32"
+  ]
+}
