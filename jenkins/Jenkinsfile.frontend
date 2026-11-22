@@ -79,43 +79,38 @@ spec:
         }
 
         stage('Deploy to S3') {
-            when {
-                branch 'main'
-            }
-            steps {
-                container('aws-cli') {
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                         credentialsId: 'AWS_CREDENTIALS']
-                    ]) {
-                        sh '''
-                            aws s3 sync frontend/dist/ s3://${S3_BUCKET_NAME}/ \
-                                --delete --region ${AWS_REGION}
-                        '''
-                    }
-                }
+    steps {
+        container('aws-cli') {
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: 'AWS_CREDENTIALS']
+            ]) {
+                sh '''
+                    aws s3 sync frontend/dist/ s3://${S3_BUCKET_NAME}/ \
+                        --delete --region ${AWS_REGION}
+                '''
             }
         }
+    }
+}
 
         stage('CloudFront Invalidation') {
-            when {
-                branch 'main'
-            }
-            steps {
-                container('aws-cli') {
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                         credentialsId: 'AWS_CREDENTIALS']
-                    ]) {
-                        sh '''
-                            aws cloudfront create-invalidation \
-                                --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} \
-                                --paths "/*"
-                        '''
-                    }
-                }
+    steps {
+        container('aws-cli') {
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: 'AWS_CREDENTIALS']
+            ]) {
+                sh '''
+                    aws cloudfront create-invalidation \
+                        --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} \
+                        --paths "/*"
+                '''
             }
         }
+    }
+}
+    
     }
 
     post {
